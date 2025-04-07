@@ -7,7 +7,12 @@ use App\Models\Category;
 
 class CategoryRepository implements CategoryInterface
 {
-  public function index()
+  public function getAllCategories()
+  {
+    return Category::all();
+  }
+
+  public function topCategory()
   {
     $topCategories = Category::withCount('products')
       ->orderBy('products_count', 'desc')
@@ -15,6 +20,7 @@ class CategoryRepository implements CategoryInterface
       ->get();
     return $topCategories;
   }
+
   public function getCategoryById($id)
   {
     return Category::find($id);
