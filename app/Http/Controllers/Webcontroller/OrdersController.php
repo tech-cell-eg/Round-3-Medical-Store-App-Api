@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Webcontroller;
+use App\Http\Controllers\Controller;
+use App\Models\Orders;
+use App\Http\Requests\StoreOrdersRequest;
+use App\Http\Requests\UpdateOrdersRequest;
 
-use App\Models\Category;
-use App\Http\Requests\StoreCategoryRequest;
-use App\Http\Requests\UpdateCategoryRequest;
-
-class CategoryController extends Controller
+class OrdersController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -27,7 +27,7 @@ class CategoryController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreCategoryRequest $request)
+    public function store(StoreOrdersRequest $request)
     {
         //
     }
@@ -35,7 +35,7 @@ class CategoryController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Category $category)
+    public function show(Orders $orders)
     {
         //
     }
@@ -43,7 +43,7 @@ class CategoryController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Category $category)
+    public function edit(Orders $orders)
     {
         //
     }
@@ -51,7 +51,7 @@ class CategoryController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateCategoryRequest $request, Category $category)
+    public function update(UpdateOrdersRequest $request, Orders $orders)
     {
         //
     }
@@ -59,7 +59,7 @@ class CategoryController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Category $category)
+    public function destroy(Orders $orders)
     {
         //
     }
