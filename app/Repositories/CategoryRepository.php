@@ -7,7 +7,7 @@ use App\Models\Category;
 
 class CategoryRepository implements CategoryInterface
 {
-  public function getAllCategories()
+  public function index()
   {
     return Category::all();
   }

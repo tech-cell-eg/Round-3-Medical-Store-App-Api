@@ -7,6 +7,7 @@ use App\Http\Resources\ProductResource;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use App\RepositoryInterface\ProductInterface;
+use App\Http\Resources\ProductDetailsResource;
 
 class ProductApi extends Controller
 {
@@ -21,19 +22,27 @@ class ProductApi extends Controller
   public function index()
   {
     $products = $this->productRepository->index();
-    
+
     return ProductResource::collection($products);
 
     //
 
 
   }
-  Public function getProductsByCategory($categoryId)
+  public function getProductsByCategory($categoryId)
   {
     $products = $this->productRepository->getProductsByCategory($categoryId);
     return ProductResource::collection($products);
   }
-  
+
+
+  public function getProductDetails($productId)
+  {
+
+    $product = $this->productRepository->getProductDetails($productId);
+    return new ProductDetailsResource($product);
+  }
+
 
   /**
    * Store a newly created resource in storage.

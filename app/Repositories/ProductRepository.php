@@ -44,4 +44,8 @@ class ProductRepository implements ProductInterface
   {
     return Product::where('category_id', $categoryId)->get();
   }
+  public function getProductDetails($productId)
+  {
+    return Product::with(['category', 'reviews.user'])->find($productId);
+  }
 }

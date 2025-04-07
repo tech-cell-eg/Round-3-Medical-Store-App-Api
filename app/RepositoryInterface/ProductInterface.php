@@ -10,4 +10,5 @@ interface ProductInterface
   public function updateProduct($id, $data);
   public function deleteProduct($id);
   public function getProductsByCategory($categoryId);
+  public function getProductDetails($productId);
 }
