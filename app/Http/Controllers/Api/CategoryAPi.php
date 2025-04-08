@@ -27,6 +27,12 @@ class CategoryApi extends Controller
     return CategoryResource::collection($categories);
   }
 
+  public function topCategory()
+  {
+    $categories = $this->categoryRepository->topCategory();
+    return CategoryResource::collection($categories);
+  }
+
   /**
    * Show the form for creating a new resource.
    */

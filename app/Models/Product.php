@@ -14,7 +14,9 @@ class Product extends Model
         'quantity',
         'active_ingredient',
         'manufacturer',
-        'expiry_date'
+        'expiry_date',
+        'category_id',
+        'user_id',
     ];
 
     protected $casts = [
@@ -22,20 +24,24 @@ class Product extends Model
         'expiry_date' => 'date',
     ];
 
-    public function media()
+
+    public function media(): MorphMany
     {
         return $this->morphMany(Media::class, 'mediable');
     }
+
 
     public function cartItems()
     {
         return $this->hasMany(CartItem::class);
     }
 
+
     public function orderItems()
     {
         return $this->hasMany(OrderItem::class);
     }
+
 
     public function getFeaturedImageAttribute()
     {
@@ -45,5 +51,30 @@ class Product extends Model
     public function getCurrentPriceAttribute()
     {
         return $this->price;
+    }
+
+
+    public function category()
+    {
+        return $this->belongsTo(Category::class);
+    }
+
+    public function users()
+    {
+        return $this->belongsToMany(User::class)
+            ->withPivot('quantity', 'price')
+            ->withTimestamps();
+    }
+
+
+    public function owner()
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
+
+    public function reviews()
+    {
+        return $this->hasMany(Review::class);
     }
 }

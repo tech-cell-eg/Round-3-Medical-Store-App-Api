@@ -31,11 +31,7 @@ class User extends Authenticatable
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
+  
     protected function casts(): array
     {
         return [
@@ -80,4 +76,9 @@ class User extends Authenticatable
         return $this->addresses()->where('is_default', true)->first();
     }
 
+
+  public function reviews()
+  {
+    return $this->hasMany(Review::class);
+  }
 }
