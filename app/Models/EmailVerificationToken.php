@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
-class PhoneVerificationToken extends Model
+class EmailVerificationToken extends Model
 {
     use HasFactory;
 

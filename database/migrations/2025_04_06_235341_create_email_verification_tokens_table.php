@@ -11,9 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('phone_verification_tokens', function (Blueprint $table) {
+        Schema::create('email_verification_tokens', function (Blueprint $table) {
             $table->id();
-            $table->string('phone');
+            $table->string('email');
             $table->string('token');
             $table->timestamp('expires_at');
 
