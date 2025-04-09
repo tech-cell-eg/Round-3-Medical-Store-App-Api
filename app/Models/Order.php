@@ -16,16 +16,11 @@ class Order extends Model
         'total',
         'payment_method',
         'status',
-        'coupon_code'
+        'coupon_code',
+        'notes'
     ];
 
-    protected $casts = [
-        'subtotal' => 'decimal:2',
-        'item_discount' => 'decimal:2',
-        'coupon_discount' => 'decimal:2',
-        'shipping' => 'decimal:2',
-        'total' => 'decimal:2',
-    ];
+
 
     public function user()
     {
