@@ -2,25 +2,26 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Product extends Model
 {
+    use HasFactory;
     protected $fillable = [
         'name',
         'description',
         'price',
-        'quantity',
-        'active_ingredient',
-        'manufacturer',
-        'expiry_date',
         'category_id',
-        'user_id',
+        'quantity',
+        'active_ingred',
+        'manufacture',
+        'expiry_date',
+        'user_id'
     ];
 
     protected $casts = [
-        'price' => 'decimal:2',
         'expiry_date' => 'date',
     ];
 
