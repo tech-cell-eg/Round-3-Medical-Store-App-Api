@@ -11,7 +11,7 @@ class EmailVerificationToken extends Model
     use HasFactory;
 
     protected $fillable = [
-        'phone',
+        'email',
         'token',
         'expires_at',
     ];

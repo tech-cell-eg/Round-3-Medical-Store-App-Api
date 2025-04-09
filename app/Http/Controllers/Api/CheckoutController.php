@@ -6,22 +6,93 @@ use App\Models\Order;
 use App\Models\CartItem;
 use App\Models\OrderItem;
 use App\Models\UserAddress;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Traits\ApiResponse;
+use App\Http\Requests\Checkout\PlaceOrderRequest;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 
 class CheckoutController extends Controller
 {
+    use ApiResponse;
+
     public function summary()
     {
-        $user = Auth::user();
+        try {
+            $user = Auth::user();
+            $cartItems = $this->getUserCartItems($user);
+            $addresses = $this->getUserAddresses($user);
 
-        $cartItems = $user->cartItems()->with(['product' => function($query) {
+            $summary = $this->calculateOrderSummary($cartItems);
+
+            return $this->successResponse([
+                'items' => $this->formatCartItems($cartItems),
+                'addresses' => $addresses,
+                'payment_summary' => $summary
+            ], 'Checkout summary retrieved successfully');
+
+        } catch (\Exception $e) {
+            return $this->errorResponse('Failed to get checkout summary: ' . $e->getMessage(), 500);
+        }
+    }
+
+    public function placeOrder(PlaceOrderRequest $request)
+    {
+        $user = Auth::user();
+        $address = $user->addresses()->findOrFail($request->address_id);
+
+        DB::beginTransaction();
+
+        try {
+            $cartItems = $user->cartItems()->with('product')->get();
+
+            if ($cartItems->isEmpty()) {
+                return $this->errorResponse('Your cart is empty', 400);
+            }
+
+            $summary = $this->calculateOrderSummary($cartItems);
+            $order = $this->createOrder($user, $address, $summary, $request->payment_method);
+            $this->createOrderItems($order, $cartItems);
+            $this->updateProductQuantities($cartItems);
+            $user->cartItems()->delete();
+
+            DB::commit();
+
+            return $this->successResponse([
+                'order_id' => $order->id,
+                'total' => $summary['total'],
+                'delivery_address' => $this->formatFullAddress($address)
+            ], 'Order placed successfully');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return $this->errorResponse('Failed to place order: ' . $e->getMessage(), 500);
+        }
+    }
+
+    private function getUserCartItems($user)
+    {
+        return $user->cartItems()->with(['product' => function($query) {
             $query->with('media');
         }])->get();
+    }
 
-        $items = $cartItems->map(function ($item) {
+    private function getUserAddresses($user)
+    {
+        return $user->addresses()->get()->map(function ($address) {
+            return [
+                'id' => $address->id,
+                'label' => $address->label,
+                'contact_number' => $address->contact_number,
+                'full_address' => $this->formatFullAddress($address),
+                'is_default' => $address->is_default
+            ];
+        });
+    }
+
+    private function formatCartItems($cartItems)
+    {
+        return $cartItems->map(function ($item) {
             return [
                 'product_id' => $item->product_id,
                 'name' => $item->product->name,
@@ -32,127 +103,62 @@ class CheckoutController extends Controller
                 'item_total' => $item->price * $item->quantity
             ];
         });
+    }
 
-        $subtotal = $items->sum('item_total');
-        $itemDiscount = $this->calculateItemDiscount($cartItems);
-        $couponDiscount = 0;
-        $shipping = 0;
-
-        $total = $subtotal - $itemDiscount - $couponDiscount + $shipping;
-
-        $addresses = $user->addresses()->get()->map(function ($address) {
-            return [
-                'id' => $address->id,
-                'label' => $address->label,
-                'contact_number' => $address->contact_number,
-                'full_address' => $this->formatFullAddress($address),
-                'is_default' => $address->is_default
-            ];
+    private function calculateOrderSummary($cartItems)
+    {
+        $subtotal = $cartItems->sum(function ($item) {
+            return $item->price * $item->quantity;
         });
 
-        return response()->json([
-            'items' => $items,
-            'addresses' => $addresses,
-            'payment_summary' => [
-                'subtotal' => $subtotal,
-                'item_discount' => -$itemDiscount,
-                'coupon_discount' => -$couponDiscount,
-                'shipping' => $shipping,
-                'total' => $total
-            ]
+        $itemDiscount = $this->calculateItemDiscount($cartItems);
+        $shipping = 0;
+        $total = $subtotal - $itemDiscount + $shipping;
+
+        return [
+            'subtotal' => $subtotal,
+            'item_discount' => -$itemDiscount,
+            'shipping' => $shipping,
+            'total' => $total
+        ];
+    }
+
+    private function createOrder($user, $address, $summary, $paymentMethod)
+    {
+        return $user->orders()->create([
+            'address_id' => $address->id,
+            'subtotal' => $summary['subtotal'],
+            'item_discount' => $summary['item_discount'],
+            'shipping' => $summary['shipping'],
+            'total' => $summary['total'],
+            'payment_method' => $paymentMethod,
+            'status' => $paymentMethod === 'pay_now' ? 'paid' : 'pending'
         ]);
     }
 
-    public function applyCoupon(Request $request)
+    private function createOrderItems($order, $cartItems)
     {
-        $request->validate([
-            'coupon_code' => 'required|string'
-        ]);
-
-        $couponDiscount = 15.80;
-
-        return response()->json([
-            'message' => 'Coupon applied successfully',
-            'coupon_discount' => $couponDiscount
-        ]);
-    }
-
-
-    public function placeOrder(Request $request)
-    {
-        $validated = $request->validate([
-            'address_id' => 'required|exists:user_addresses,id',
-            'payment_method' => 'required|in:pay_now,cod'
-        ]);
-
-        $user = Auth::user();
-
-        $address = $user->addresses()->findOrFail($validated['address_id']);
-
-        DB::beginTransaction();
-
-        try {
-            $cartItems = $user->cartItems()->with('product')->get();
-
-            if ($cartItems->isEmpty()) {
-                return response()->json(['message' => 'Your cart is empty'], 400);
-            }
-
-            $subtotal = $cartItems->sum(function ($item) {
-                return $item->price * $item->quantity;
-            });
-
-            $itemDiscount = $this->calculateItemDiscount($cartItems);
-            $couponDiscount = 15.80;
-            $shipping = 0;
-            $total = $subtotal - $itemDiscount - $couponDiscount + $shipping;
-
-            $order = $user->orders()->create([
-                'address_id' => $address->id,
-                'subtotal' => $subtotal,
-                'item_discount' => $itemDiscount,
-                'coupon_discount' => $couponDiscount,
-                'shipping' => $shipping,
-                'total' => $total,
-                'payment_method' => $validated['payment_method'],
-                'status' => $validated['payment_method'] === 'pay_now' ? 'paid' : 'pending'
-            ]);
-
-            foreach ($cartItems as $cartItem) {
-                OrderItem::create([
-                    'order_id' => $order->id,
-                    'product_id' => $cartItem->product_id,
-                    'quantity' => $cartItem->quantity,
-                    'price' => $cartItem->price,
-                    'discount' => 0
-                ]);
-
-                $cartItem->product->decrement('quantity', $cartItem->quantity);
-            }
-
-            $user->cartItems()->delete();
-
-            DB::commit();
-
-            return response()->json([
-                'message' => 'Order placed successfully',
+        foreach ($cartItems as $cartItem) {
+            OrderItem::create([
                 'order_id' => $order->id,
-                'total' => $total,
-                'delivery_address' => $this->formatFullAddress($address)
+                'product_id' => $cartItem->product_id,
+                'quantity' => $cartItem->quantity,
+                'price' => $cartItem->price,
+                'discount' => 0
             ]);
+        }
+    }
 
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'message' => 'Failed to place order',
-                'error' => $e->getMessage()
-            ], 500);
+    private function updateProductQuantities($cartItems)
+    {
+        foreach ($cartItems as $cartItem) {
+            $cartItem->product->decrement('quantity', $cartItem->quantity);
         }
     }
 
     private function calculateItemDiscount($cartItems)
     {
-        return 28.80;
+        return 0;
     }
 
     private function formatFullAddress($address)

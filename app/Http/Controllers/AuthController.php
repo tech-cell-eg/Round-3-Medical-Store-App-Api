@@ -1,338 +1,207 @@
 <?php
-
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Requests\Auth\OtpRequest;
+use App\Http\Requests\Auth\SignupRequest;
+use App\Http\Requests\Auth\VerifyOtpRequest;
 use App\Models\EmailVerificationToken;
 use App\Models\User;
+use App\Traits\ApiResponse;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Password;
-use Illuminate\Validation\Rules\Password as PasswordRule;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
-    public function signup(Request $request)
-    {
-        $request->validate([
-            'email' => 'required|string|email|unique:users',
-            'name' => 'required|string|max:255',
-            'password' => [
-                'required',
-                'confirmed',
-                PasswordRule::min(8)
-                    ->mixedCase()
-                    ->numbers()
-                    ->symbols()
-            ],
-        ]);
+    use ApiResponse;
 
+    public function signup(SignupRequest $request)
+    {
         try {
+            DB::beginTransaction();
+
             $user = User::create([
-                'email' => $request->email,
-                'name' => $request->name,
+                'email'    => $request->email,
+                'name'     => $request->name,
                 'password' => Hash::make($request->password),
             ]);
+            $otp = $this->generateAndStoreOtp($request->email);
 
-            $otp = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
-            $expiresAt = Carbon::now()->addMinutes(10);
+            DB::commit();
 
-            EmailVerificationToken::updateOrCreate(
-                ['email' => $request->email],
-                ['token' => $otp, 'expires_at' => $expiresAt]
-            );
+            return $this->successResponse([
+                'user_id'    => $user->id,
+                'email'      => $request->email,
+                'otp'        => $otp,
+                'expires_in' => 600,
+            ], 'Registration successful. Please verify your email address.', 201);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Registration successful. Please verify your email address.',
-                'data' => [
-                    'user_id' => $user->id,
-                    'email' => $request->email,
-                    'otp' => $otp,
-                    'expires_in' => 600,
-                ],
-            ], 201);
+        } catch (QueryException $e) {
+            DB::rollBack();
+            return $this->errorResponse('Database error during registration', 500);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Registration failed: ' . $e->getMessage(),
-            ], 500);
+            DB::rollBack();
+            return $this->errorResponse('Registration failed: ' . $e->getMessage(), 500);
         }
     }
 
-    public function login(Request $request)
+    public function login(LoginRequest $request)
     {
-        $request->validate([
-            'email' => 'required|string|email',
-            'password' => 'required|string',
-        ]);
-
         try {
-            if (!Auth::attempt($request->only('email', 'password'))) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid login credentials',
-                ], 401);
+            if (! Auth::attempt($request->only('email', 'password'))) {
+                return $this->errorResponse('Invalid login credentials', 401);
             }
 
-            $user = User::where('email', $request->email)->first();
+            $user  = User::where('email', $request->email)->firstOrFail();
             $token = $user->createToken('auth-token')->plainTextToken;
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Login successful',
-                'data' => [
-                    'access_token' => $token,
-                    'token_type' => 'Bearer',
-                    'user' => $user,
-                ],
-            ]);
+            return $this->successResponse([
+                'access_token' => $token,
+                'token_type'   => 'Bearer',
+                'user'         => $user,
+            ], 'Login successful');
+
+        } catch (QueryException $e) {
+            return $this->errorResponse('Database error during login', 500);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Login failed: ' . $e->getMessage(),
-            ], 500);
+            return $this->errorResponse('Login failed: ' . $e->getMessage(), 500);
         }
     }
 
-    public function sendOTP(Request $request)
+    public function sendOTP(OtpRequest $request)
     {
-        $request->validate([
-            'email' => 'required|string|email',
-        ]);
-
         try {
             $user = User::where('email', $request->email)->first();
 
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User not found',
-                ], 404);
+            if (! $user) {
+                return $this->errorResponse('User not found', 404);
             }
 
-            $otp = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
-            $expiresAt = Carbon::now()->addMinutes(10);
+            $otp = $this->generateAndStoreOtp($request->email);
 
-            EmailVerificationToken::updateOrCreate(
-                ['email' => $request->email],
-                ['token' => $otp, 'expires_at' => $expiresAt]
-            );
+            return $this->successResponse([
+                'email'      => $request->email,
+                'otp'        => $otp,
+                'expires_in' => 600,
+            ], 'OTP sent successfully');
 
-
-            return response()->json([
-                'success' => true,
-                'message' => 'OTP sent successfully',
-                'data' => [
-                    'email' => $request->email,
-                    'otp' => $otp,
-                    'expires_in' => 600,
-                ],
-            ]);
+        } catch (QueryException $e) {
+            return $this->errorResponse('Database error sending OTP', 500);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to send OTP: ' . $e->getMessage(),
-            ], 500);
+            return $this->errorResponse('Failed to send OTP: ' . $e->getMessage(), 500);
+        }
+    }
+    public function resendOTP(OtpRequest $request)
+    {
+        try {
+            $user = User::where('email', $request->email)->first();
+
+            if (! $user) {
+                return $this->errorResponse('User not found', 404);
+            }
+
+            if ($user->hasVerifiedEmail()) {
+                return $this->errorResponse('Email already verified', 400);
+            }
+
+            EmailVerificationToken::where('email', $request->email)->delete();
+
+            $otp = $this->generateAndStoreOtp($request->email);
+
+            return $this->successResponse([
+                'email'      => $request->email,
+                'otp'        => $otp,
+                'expires_in' => 600,
+            ], 'OTP resent successfully');
+
+        } catch (QueryException $e) {
+            return $this->errorResponse('Database error resending OTP', 500);
+        } catch (\Exception $e) {
+            return $this->errorResponse('Failed to resend OTP: ' . $e->getMessage(), 500);
         }
     }
 
-    public function verifyOTP(Request $request)
+    public function verifyOTP(VerifyOtpRequest $request)
     {
-        $request->validate([
-            'email' => 'required|string|email',
-            'otp' => 'required|string|size:6',
-        ]);
-
         try {
+            DB::beginTransaction();
+
             $verification = EmailVerificationToken::where([
                 'email' => $request->email,
                 'token' => $request->otp,
             ])->first();
 
-            if (!$verification || $verification->expires_at < now()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid or expired OTP',
-                ], 422);
+            if (! $verification || $verification->expires_at < now()) {
+                return $this->errorResponse('Invalid or expired OTP', 422);
             }
 
             $user = User::where('email', $request->email)->first();
-
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User not found',
-                ], 404);
+            if (! $user) {
+                return $this->errorResponse('User not found', 404);
             }
 
-            if (!$user->hasVerifiedEmail()) {
+            if (! $user->hasVerifiedEmail()) {
                 $user->markEmailAsVerified();
             }
 
             $token = $user->createToken('auth-token')->plainTextToken;
-            $verification->delete();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Email verified successfully',
-                'data' => [
-                    'access_token' => $token,
-                    'token_type' => 'Bearer',
-                    'user' => $user,
-                ],
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'OTP verification failed: ' . $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    public function resendOTP(Request $request)
-    {
-        $request->validate([
-            'email' => 'required|string|email',
-        ]);
-
-        try {
-            $user = User::where('email', $request->email)->first();
-
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User not found',
-                ], 404);
-            }
-
-            if ($user->hasVerifiedEmail()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Email already verified',
-                ], 422);
-            }
-
-            return $this->sendOTP($request);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to resend OTP: ' . $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    public function forgotPassword(Request $request)
-    {
-        $request->validate([
-            'email' => 'required|email',
-        ]);
-
-        try {
-            $user = User::where('email', $request->email)->first();
-
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User not found',
-                ], 404);
-            }
-
-            $otp = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
-            $expiresAt = Carbon::now()->addMinutes(10);
-
-            EmailVerificationToken::updateOrCreate(
-                ['email' => $request->email],
-                ['token' => $otp, 'expires_at' => $expiresAt]
-            );
-
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Password reset OTP sent successfully',
-                'data' => [
-                    'email' => $request->email,
-                    'otp' => $otp,
-                    'expires_in' => 600,
-                ],
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to send reset OTP: ' . $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    public function resetPassword(Request $request)
-    {
-        $request->validate([
-            'email' => 'required|email',
-            'otp' => 'required|string|size:6',
-            'password' => [
-                'required',
-                'confirmed',
-                PasswordRule::min(8)
-                    ->mixedCase()
-                    ->numbers()
-                    ->symbols()
-            ],
-        ]);
-
-        try {
-            $verification = EmailVerificationToken::where([
-                'email' => $request->email,
-                'token' => $request->otp,
-            ])->first();
-
-            if (!$verification || $verification->expires_at < now()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid or expired OTP',
-                ], 422);
-            }
-
-            $user = User::where('email', $request->email)->first();
-
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User not found',
-                ], 404);
-            }
-
-            $user->password = Hash::make($request->password);
-            $user->save();
 
             $verification->delete();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Password has been reset successfully',
-            ]);
+            DB::commit();
+
+            return $this->successResponse([
+                'access_token' => $token,
+                'token_type'   => 'Bearer',
+                'user'         => $user,
+            ], 'Email verified successfully');
+
+        } catch (QueryException $e) {
+            DB::rollBack();
+            return $this->errorResponse('Database error during OTP verification', 500);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Password reset failed: ' . $e->getMessage(),
-            ], 500);
+            DB::rollBack();
+            return $this->errorResponse('OTP verification failed: ' . $e->getMessage(), 500);
         }
     }
-
     public function logout(Request $request)
     {
         try {
             $request->user()->currentAccessToken()->delete();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Successfully logged out',
-            ]);
+            return $this->successResponse(
+                null,
+                'Successfully logged out'
+            );
+
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Logout failed: ' . $e->getMessage(),
-            ], 500);
+            return $this->errorResponse(
+                'Logout failed: ' . $e->getMessage(),
+                500
+            );
+        }
+    }
+    protected function generateAndStoreOtp($email)
+    {
+        try {
+            $otp       = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
+            $expiresAt = Carbon::now()->addMinutes(10);
+
+            $token = EmailVerificationToken::updateOrCreate(
+                ['email' => $email],
+                [
+                    'token'      => $otp,
+                    'expires_at' => $expiresAt,
+                ]
+            );
+
+            return $otp;
+        } catch (QueryException $e) {
+            throw new \Exception('Failed to generate OTP due to database error');
         }
     }
 }
