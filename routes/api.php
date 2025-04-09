@@ -26,7 +26,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::prefix('cart')->group(function () {
-        Route::get('/', [CartController::class, 'index']);
+        Route::get('/', [CartController::class, 'index'])->name('cart.index');
         Route::post('/add', [CartController::class, 'addToCart']);
         Route::put('/update/{cartItem}', [CartController::class, 'updateCartItem']);
         Route::delete('/remove/{cartItem}', [CartController::class, 'removeFromCart']);
@@ -43,7 +43,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     Route::prefix('checkout')->group(function () {
         Route::get('/summary', [CheckoutController::class, 'summary']);
-        Route::post('/apply-coupon', [CheckoutController::class, 'applyCoupon']);
         Route::post('/place-order', [CheckoutController::class, 'placeOrder']);
     });
 });
