@@ -204,4 +204,13 @@ class AuthController extends Controller
             throw new \Exception('Failed to generate OTP due to database error');
         }
     }
+    public function info(Request $request)
+    {
+        try {
+            $user = $request->user();
+            return $this->successResponse($user, 'User info retrieved successfully');
+        } catch (\Exception $e) {
+            return $this->errorResponse('Failed to retrieve user info: ' . $e->getMessage(), 500);
+        }
+    }
 }
