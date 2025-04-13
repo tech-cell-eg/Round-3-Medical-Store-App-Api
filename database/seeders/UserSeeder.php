@@ -14,9 +14,15 @@ class UserSeeder extends Seeder
   public function run(): void
   {
     //
+<<<<<<< Updated upstream
     User::factory()->count(10)->create([
       'password' => bcrypt('1234'),
        // Set a default password for all users
     ]);
+=======
+
+
+    User::factory()->count(10)->create();
+>>>>>>> Stashed changes
   }
 }

@@ -21,6 +21,12 @@ class DatabaseSeeder extends Seeder
             CategorySeeder::class,
             ProductSeeder::class,
             ReviewSeeder::class,
+<<<<<<< Updated upstream
+=======
+            CartItemSeeder::class,
+            OrderSeeder::class,
+            NotificationSeeder::class,
+>>>>>>> Stashed changes
         ]);
         
 
