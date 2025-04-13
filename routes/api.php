@@ -21,7 +21,9 @@ Route::post('/resend-otp', [AuthController::class, 'resendOTP']);
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
+
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/info', [AuthController::class, 'info']);
     Route::post('/logout', [AuthController::class, 'logout']);
 });
 
