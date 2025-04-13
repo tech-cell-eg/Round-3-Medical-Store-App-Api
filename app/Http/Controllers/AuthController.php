@@ -61,8 +61,11 @@ class AuthController extends Controller
 
             return $this->successResponse([
                 'access_token' => $token,
-                'token_type'   => 'Bearer',
-                'user'         => $user,
+                'user'         => [
+                    'id'=> $user->id,
+                    'name'=> $user->name,
+                    'email'=> $user->email,
+                ],
             ], 'Login successful');
 
         } catch (QueryException $e) {
@@ -208,7 +211,12 @@ class AuthController extends Controller
     {
         try {
             $user = $request->user();
-            return $this->successResponse($user, 'User info retrieved successfully');
+            $data = [
+                'id'    => $user->id,
+                'name'  => $user->name,
+                'email' => $user->email,
+            ];
+            return $this->successResponse($data, 'User info retrieved successfully');
         } catch (\Exception $e) {
             return $this->errorResponse('Failed to retrieve user info: ' . $e->getMessage(), 500);
         }
