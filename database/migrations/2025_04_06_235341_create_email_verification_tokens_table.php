@@ -11,8 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('orders', function (Blueprint $table) {
+        Schema::create('email_verification_tokens', function (Blueprint $table) {
             $table->id();
+            $table->string('email');
+            $table->string('token');
+            $table->timestamp('expires_at');
+
             $table->timestamps();
         });
     }
@@ -22,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('orders');
+        Schema::dropIfExists('phone_verification_tokens');
     }
 };

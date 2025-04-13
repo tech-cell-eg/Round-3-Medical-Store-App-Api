@@ -1,28 +1,20 @@
 <?php
 
-<<<<<<< Updated upstream
-=======
+
 use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\CategoryApi;
 use App\Http\Controllers\Api\CheckoutController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\NotificationController;
->>>>>>> Stashed changes
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\CategoryApi;
 use App\Http\Controllers\Api\ProductApi;
 
 
 Route::get('/user', function (Request $request) {
   return $request->user();
 })->middleware('auth:sanctum');
-<<<<<<< Updated upstream
-Route::get('categories/top', [CategoryApi::class, 'topCategory']);
-Route::resource('categories', CategoryApi::class);
-Route::get('categories/{categoryId}/products', [ProductApi::class, 'getProductsByCategory']);
-=======
 
 Route::post('/signup', [AuthController::class, 'signup']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -32,7 +24,9 @@ Route::post('/resend-otp', [AuthController::class, 'resendOTP']);
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
+
 Route::middleware('auth:sanctum')->group(function () {
+  Route::get('/info', [AuthController::class, 'info']);
   Route::post('/logout', [AuthController::class, 'logout']);
 });
 
@@ -66,7 +60,6 @@ Route::get('/user', function (Request $request) {
 Route::get('categories/top', [CategoryApi::class, 'topCategory']);
 Route::resource('categories', CategoryApi::class);
 Route::get('category/{categoryId}/products', [ProductApi::class, 'getProductsByCategory']);
->>>>>>> Stashed changes
 Route::get('products/{productId}', [ProductApi::class, 'getProductDetails']);
 Route::resource('products', ProductApi::class);
 Route::middleware('auth:sanctum')->group(function () {
