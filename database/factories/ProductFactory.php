@@ -23,6 +23,7 @@ class ProductFactory extends Factory
       'description' => $this->faker->sentence(),
       'price' => $this->faker->randomFloat(2, 1, 1000),
       'category_id' => Category::inRandomOrder()->first()->id,
+      
       // Assuming you have 10 categories
       'active_ingred' => $this->faker->word(),
       'manufacture' => $this->faker->company(),

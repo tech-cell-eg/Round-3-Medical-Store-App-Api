@@ -18,6 +18,7 @@ class CategoryResource extends JsonResource
       return [
         'status' => 'error',
         'message' => 'Category not found',
+      
       ];
     }
     return [
